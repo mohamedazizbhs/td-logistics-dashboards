@@ -1,0 +1,402 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>CO2 Dashboard — Sustainability</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="js/france-map-background.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 950px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+    }
+
+    nav a {
+      margin-right: 1rem;
+    }
+
+    h1 {
+      margin-top: 2rem;
+    }
+
+    p {
+      line-height: 1.6;
+    }
+
+    .kpis {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 1.5rem 0;
+    }
+
+    .kpi {
+      flex: 1;
+      min-width: 180px;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .kpi .value {
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: #2e8b46;
+    }
+
+    .kpi .label {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.4rem;
+    }
+
+    #assumptions {
+      font-size: 0.85rem;
+      color: #666;
+      padding: 0.8rem 1rem;
+      border-left: 3px solid #2e8b46;
+      background: #f5faf6;
+      margin: 1.5rem 0;
+      line-height: 1.6;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 420px;
+      margin: 2rem 0;
+    }
+
+    .map-container {
+      position: relative;
+      height: 480px;
+      margin: 2rem 0;
+    }
+
+    @media (max-width: 600px) {
+      .chart-container {
+        height: 370px;
+      }
+
+      .map-container {
+        height: 390px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <a href="index.html">Overview</a> |
+    <strong>CO2 (sustainability)</strong> |
+    <a href="cost.html">Cost (operations)</a> |
+    <a href="network.html">Network (strategy)</a>
+  </nav>
+
+  <h1>
+    Which routes should we prioritize to cut network CO2?
+  </h1>
+
+  <p>
+    For: Sustainability / CSR Manager.
+    This dashboard identifies the delivery routes
+    producing the most CO2 and the geographic areas
+    where emissions are concentrated.
+  </p>
+
+  <div class="kpis" id="kpis">
+    Loading KPI data...
+  </div>
+
+  <div id="assumptions"></div>
+
+  <h2>Highest-CO2 Routes</h2>
+
+  <p>
+    The horizontal bar chart ranks the 10 routes with
+    the highest estimated CO2 emissions.
+    Each bar represents a route that could be
+    considered for improvement.
+  </p>
+
+  <div class="chart-container">
+    <canvas id="topLinksChart"></canvas>
+  </div>
+
+  <h2>Where Emissions Concentrate</h2>
+
+  <p>
+    Cities are plotted using real geographic coordinates
+    over a simplified outline of France.
+
+    Existing warehouses are represented by triangles.
+    Other cities are represented by circles.
+
+    Larger and redder circles indicate higher
+    estimated CO2 contributions.
+  </p>
+
+  <div class="map-container">
+    <canvas id="mapChart"></canvas>
+  </div>
+
+  <script>
+    fetch('data/co2.json')
+
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Unable to load co2.json');
+        }
+
+        return response.json();
+      })
+
+      .then(data => {
+
+        // Check if the JSON has been generated
+        if (!data.by_warehouse) {
+          document.getElementById('kpis').textContent =
+            'No CO2 analysis yet. Run the GitHub Actions workflow.';
+          return;
+        }
+
+        // Display KPI cards
+        document.getElementById('kpis').innerHTML = `
+          <div class="kpi">
+            <div class="value">
+              ${(data.total_co2_kg / 1000).toFixed(0)} t
+            </div>
+            <div class="label">
+              Total Network CO2 / Year
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="value">
+              ${data.co2_kg_per_tonne_network_avg}
+            </div>
+            <div class="label">
+              kg CO2 per Tonne Delivered
+            </div>
+          </div>
+        `;
+
+        // Display assumptions
+        document.getElementById('assumptions').textContent =
+          `Assumptions: ${data.assumptions.co2_factor_kg_per_tonne_km}
+          kg CO2e per tonne-km, and
+          ${data.assumptions.tonnes_per_1000_residents_per_year}
+          tonnes of estimated annual demand per 1,000 residents.
+          These are illustrative values, not measured freight data.`;
+
+        // Chart 1: Top 10 CO2 routes
+        const top = data.top_links || [];
+
+        new Chart(
+          document.getElementById('topLinksChart'),
+          {
+            type: 'bar',
+
+            data: {
+              labels: top.map(
+                l => `${l.city} <- ${l.warehouse}`
+              ),
+
+              datasets: [{
+                label: 'CO2 (kg/year)',
+                data: top.map(l => l.co2_kg),
+                backgroundColor: '#2e8b46'
+              }]
+            },
+
+            options: {
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+
+              plugins: {
+                legend: {
+                  display: false
+                },
+
+                title: {
+                  display: true,
+                  text: 'Top 10 Highest-CO2 Routes'
+                },
+
+                tooltip: {
+                  callbacks: {
+                    label: context => {
+                      const route = top[context.dataIndex];
+
+                      return [
+                        `CO2: ${route.co2_kg} kg/year`,
+                        `Distance: ${route.distance_km} km`
+                      ];
+                    }
+                  }
+                }
+              },
+
+              scales: {
+                x: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'CO2 emissions (kg/year)'
+                  }
+                }
+              }
+            }
+          }
+        );
+
+        // Chart 2: Geographic distribution
+        const cities = data.all_cities || [];
+
+        const maxCo2 = Math.max(
+          ...cities.map(c => c.co2_kg),
+          1
+        );
+
+        const warehouses = cities.filter(
+          c => c.is_warehouse
+        );
+
+        const served = cities.filter(
+          c => !c.is_warehouse
+        );
+
+        new Chart(
+          document.getElementById('mapChart'),
+          {
+            type: 'scatter',
+
+            data: {
+              datasets: [
+                {
+                  label: 'Existing Warehouse',
+
+                  data: warehouses.map(c => ({
+                    x: c.lon,
+                    y: c.lat,
+                    city: c.city,
+                    warehouse: c.warehouse,
+                    co2: c.co2_kg
+                  })),
+
+                  backgroundColor: '#1a1a2e',
+                  pointStyle: 'triangle',
+                  pointRadius: 10,
+                  pointBorderColor: '#ffffff',
+                  pointBorderWidth: 1
+                },
+
+                {
+                  label: 'City (CO2 Contribution)',
+
+                  data: served.map(c => ({
+                    x: c.lon,
+                    y: c.lat,
+                    city: c.city,
+                    warehouse: c.warehouse,
+                    co2: c.co2_kg
+                  })),
+
+                  backgroundColor: served.map(c => {
+                    const intensity =
+                      c.co2_kg / maxCo2;
+
+                    return `hsl(${
+                      Math.max(0, 120 - 120 * intensity)
+                    }, 70%, 45%)`;
+                  }),
+
+                  pointStyle: 'circle',
+
+                  pointRadius: served.map(
+                    c => 4 + 12 *
+                      Math.sqrt(c.co2_kg / maxCo2)
+                  )
+                }
+              ]
+            },
+
+            // Real outline of France
+            plugins: [franceBackgroundPlugin],
+
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+
+              plugins: {
+                legend: {
+                  position: 'bottom'
+                },
+
+                title: {
+                  display: true,
+                  text: 'CO2 Emissions Across France'
+                },
+
+                tooltip: {
+                  callbacks: {
+                    label: item => {
+                      const c = item.raw;
+
+                      if (item.datasetIndex === 0) {
+                        return `${c.city} (warehouse)`;
+                      }
+
+                      return [
+                        `${c.city} -> ${c.warehouse}`,
+                        `${c.co2.toFixed(0)} kg CO2/year`
+                      ];
+                    }
+                  }
+                }
+              },
+
+              scales: {
+                x: {
+                  title: {
+                    display: true,
+                    text: 'Longitude'
+                  },
+                  min: FRANCE_BBOX.minLon,
+                  max: FRANCE_BBOX.maxLon
+                },
+
+                y: {
+                  title: {
+                    display: true,
+                    text: 'Latitude'
+                  },
+                  min: FRANCE_BBOX.minLat,
+                  max: FRANCE_BBOX.maxLat
+                }
+              }
+            }
+          }
+        );
+
+      })
+
+      .catch(error => {
+        document.getElementById('kpis').textContent =
+          'Could not load CO2 data: ' + error.message;
+
+        console.error(error);
+      });
+  </script>
+
+</body>
+</html>
