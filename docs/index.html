@@ -1,1 +1,100 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Logistics network — three dashboards, three decisions</title>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .card {
+      display: block;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .card:hover {
+      border-color: #0d7c9e;
+    }
+
+    .card h2 {
+      margin: 0 0 0.3rem;
+    }
+
+    .card .for {
+      font-size: 0.8rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Same network, three different decisions</h1>
+
+  <p>
+    One French logistics network with 3 existing warehouses
+    and 20 real French cities.
+    Distances are computed from real coordinates.
+
+    Three dashboards are designed for three different
+    decision-makers, each with different KPIs and charts.
+  </p>
+
+  <a class="card" href="co2.html">
+    <div class="for">Sustainability / CSR manager</div>
+
+    <h2>CO2 Dashboard</h2>
+
+    <p>
+      Which routes should we prioritize to cut network CO2?
+
+      Ranked bar chart and a geographic visualization
+      to identify where emissions concentrate.
+    </p>
+  </a>
+
+  <a class="card" href="cost.html">
+    <div class="for">Logistics / Operations manager</div>
+
+    <h2>Cost Dashboard</h2>
+
+    <p>
+      Where does cost concentrate — transport or storage?
+
+      A stacked bar chart and a detailed table
+      to identify the main cost drivers.
+    </p>
+  </a>
+
+  <a class="card" href="network.html">
+    <div class="for">Strategic / Network planning manager</div>
+
+    <h2>Network Dashboard</h2>
+
+    <p>
+      Should we open a warehouse in Bordeaux or Marseille,
+      or close Lille?
+
+      Scenario comparison and geographic visualizations
+      to evaluate the network configuration.
+    </p>
+  </a>
+
+</body>
+</html>
+
