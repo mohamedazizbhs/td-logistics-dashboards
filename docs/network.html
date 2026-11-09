@@ -1,0 +1,405 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Network Dashboard — Strategy</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="js/france-map-background.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #222;
+    }
+
+    nav a {
+      margin-right: 1rem;
+    }
+
+    h1 {
+      margin-top: 2rem;
+    }
+
+    p {
+      line-height: 1.6;
+    }
+
+    .kpis {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 1.5rem 0;
+    }
+
+    .kpi {
+      flex: 1;
+      min-width: 180px;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .kpi .value {
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: #8b2ea0;
+    }
+
+    .kpi .label {
+      color: #666;
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+    }
+
+    #caveat {
+      padding: 1rem;
+      margin: 1.5rem 0;
+      border: 2px solid #c46e0a;
+      border-radius: 8px;
+      background: #faf3e8;
+      line-height: 1.6;
+    }
+
+    .scenario-chart {
+      height: 380px;
+      position: relative;
+      margin: 2rem 0;
+    }
+
+    .maps {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.5rem;
+    }
+
+    .map-container {
+      position: relative;
+      height: 390px;
+    }
+
+    @media (max-width: 750px) {
+      .maps {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <a href="index.html">Overview</a> |
+    <a href="co2.html">CO2 (sustainability)</a> |
+    <a href="cost.html">Cost (operations)</a> |
+    <strong>Network (strategy)</strong>
+  </nav>
+
+  <h1>Should we open or close a warehouse?</h1>
+
+  <p>
+    For: Strategic / Network Planning Manager.
+    This dashboard compares alternative warehouse
+    configurations using population-weighted distances.
+  </p>
+
+  <div class="kpis" id="kpis">
+    Loading network indicators...
+  </div>
+
+  <div id="caveat">
+    Loading analysis limitations...
+  </div>
+
+  <h2>Comparing Warehouse Scenarios</h2>
+
+  <p>
+    The bar chart compares four distinct network
+    configurations. Lower average distance indicates
+    better geographic coverage in this model.
+  </p>
+
+  <div class="scenario-chart">
+    <canvas id="scenarioChart"></canvas>
+  </div>
+
+  <h2>Geographic Network Comparison</h2>
+
+  <p>
+    These two maps show how cities are assigned
+    to their nearest warehouse in the baseline
+    and best-performing alternative.
+
+    Colors indicate the assigned warehouse.
+    Triangles represent warehouse locations.
+  </p>
+
+  <div class="maps">
+
+    <div>
+      <h3 id="baselineTitle">Baseline Network</h3>
+      <div class="map-container">
+        <canvas id="baselineMap"></canvas>
+      </div>
+    </div>
+
+    <div>
+      <h3 id="altTitle">Best Alternative</h3>
+      <div class="map-container">
+        <canvas id="altMap"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const WAREHOUSE_COLORS = {
+      'Paris': '#0d7c9e',
+      'Lyon': '#2e8b46',
+      'Lille': '#c46e0a',
+      'Bordeaux': '#8b2ea0',
+      'Marseille': '#d1345b'
+    };
+
+    function drawMap(canvasId, cities, title) {
+      const groups = {};
+
+      cities.forEach(city => {
+        if (!groups[city.warehouse]) {
+          groups[city.warehouse] = [];
+        }
+
+        groups[city.warehouse].push(city);
+      });
+
+      const datasets = Object.entries(groups).map(
+        ([warehouse, points]) => ({
+          label: warehouse,
+
+          data: points.map(point => ({
+            x: point.lon,
+            y: point.lat,
+            city: point.city
+          })),
+
+          backgroundColor:
+            WAREHOUSE_COLORS[warehouse] || '#888',
+
+          pointStyle: points.map(point =>
+            point.city === warehouse
+              ? 'triangle'
+              : 'circle'
+          ),
+
+          pointRadius: points.map(point =>
+            point.city === warehouse ? 11 : 6
+          ),
+
+          pointBorderColor: points.map(point =>
+            point.city === warehouse
+              ? '#000000'
+              : 'transparent'
+          ),
+
+          pointBorderWidth: points.map(point =>
+            point.city === warehouse ? 2 : 0
+          )
+        })
+      );
+
+      new Chart(
+        document.getElementById(canvasId),
+        {
+          type: 'scatter',
+
+          data: { datasets },
+
+          plugins: [franceBackgroundPlugin],
+
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+              legend: {
+                position: 'bottom'
+              },
+
+              title: {
+                display: true,
+                text: title
+              },
+
+              tooltip: {
+                callbacks: {
+                  label: item => {
+                    const point = item.raw;
+                    const warehouse = item.dataset.label;
+
+                    if (point.city === warehouse) {
+                      return `${point.city} (warehouse)`;
+                    }
+
+                    return `${point.city} -> ${warehouse}`;
+                  }
+                }
+              }
+            },
+
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: 'Longitude'
+                },
+                min: FRANCE_BBOX.minLon,
+                max: FRANCE_BBOX.maxLon
+              },
+
+              y: {
+                title: {
+                  display: true,
+                  text: 'Latitude'
+                },
+                min: FRANCE_BBOX.minLat,
+                max: FRANCE_BBOX.maxLat
+              }
+            }
+          }
+        }
+      );
+    }
+
+    fetch('data/network.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Unable to load network.json');
+        }
+        return response.json();
+      })
+
+      .then(data => {
+        if (!data.scenarios) {
+          document.getElementById('kpis').textContent =
+            'No analysis yet. Run the GitHub Actions workflow.';
+          return;
+        }
+
+        const scenarios = data.scenarios;
+
+        const baseline = scenarios.find(
+          s => s.scenario.startsWith('baseline')
+        );
+
+        const best = scenarios[0];
+
+        document.getElementById('kpis').innerHTML = `
+          <div class="kpi">
+            <div class="value">
+              ${baseline.avg_distance_km_population_weighted} km
+            </div>
+            <div class="label">
+              Baseline Average Distance
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="value">
+              ${best.avg_distance_km_population_weighted} km
+            </div>
+            <div class="label">
+              Best Scenario Average Distance
+            </div>
+          </div>
+        `;
+
+        document.getElementById('caveat').textContent =
+          'Important limitation: This is a distance-only model. ' +
+          'It does not include warehouse construction costs, ' +
+          'rent, operational constraints, transport capacity, ' +
+          'or the strategic value of existing warehouses. ' +
+          'Demand is estimated from population, not real shipments.';
+
+        new Chart(
+          document.getElementById('scenarioChart'),
+          {
+            type: 'bar',
+
+            data: {
+              labels: scenarios.map(s => s.scenario),
+
+              datasets: [{
+                label: 'Population-weighted average distance (km)',
+                data: scenarios.map(
+                  s => s.avg_distance_km_population_weighted
+                ),
+                backgroundColor: scenarios.map(
+                  s => s.scenario === best.scenario
+                    ? '#2e8b46'
+                    : '#8b2ea0'
+                ),
+                borderRadius: 4
+              }]
+            },
+
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+
+              plugins: {
+                legend: { display: false },
+
+                title: {
+                  display: true,
+                  text: 'Warehouse Network Scenario Comparison'
+                }
+              },
+
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Average distance (km)'
+                  }
+                }
+              }
+            }
+          }
+        );
+
+        document.getElementById('baselineTitle').textContent =
+          'Baseline — Paris, Lyon, Lille';
+
+        document.getElementById('altTitle').textContent =
+          'Best Alternative — ' + data.best_alternative_name;
+
+        drawMap(
+          'baselineMap',
+          data.baseline_map,
+          'Current Network'
+        );
+
+        drawMap(
+          'altMap',
+          data.best_alternative_map,
+          data.best_alternative_name
+        );
+      })
+
+      .catch(error => {
+        document.getElementById('kpis').textContent =
+          'Could not load network data: ' + error.message;
+
+        console.error(error);
+      });
+  </script>
+
+</body>
+</html>
